@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Raid!</title>
+<meta name="theme-color" content="#14213a">
+<meta name="description" content="Raid! — devleşen böceklere karşı evini koru. Tarayıcıda, telefonda ve bilgisayarda oynanan şerit savunma oyunu.">
+<link rel="icon" href="assets/bug_worker_ant.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@700;800&display=swap">
+<style>
+/* Layout: one 16:9 stage scaled to fit; HTML overlay screens sit on top of the canvas. Single night look. */
+:root{
+  --night:#14213a;
+  --night-2:#22345a;
+  --ink:#3a2414;          /* koyu kahve kontur */
+  --card:#f3d9a8;         /* karton */
+  --cream:#fff6e2;
+  --yellow:#ffd23a;
+  --yellow-dark:#c98a00;
+  --blue:#2f8cff;
+  --mutant:#7dff5a;
+  --font-display:"Fredoka","Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --font-body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% 30%,var(--night-2),var(--night) 70%);color:var(--cream);font-family:var(--font-body);
+  overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#app{position:fixed;inset:0;display:grid;place-items:center;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+#stage-wrap{position:relative}
+#stage{position:relative;width:1600px;height:900px;transform-origin:0 0}
+canvas{display:block;width:100%;height:100%;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:40px;
+  background:rgba(10,14,30,.6);border-radius:18px;z-index:5}
+
+/* karton + metal çerçeve panel */
+.panel{position:relative;color:var(--ink);text-align:center;min-width:640px;max-width:1080px;padding:20px 40px 30px;
+  border:54px solid transparent;border-image:url(assets/ui_panel.png) 70 fill / 54px stretch;
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,.45))}
+.panel.no-img{background:var(--card);border:6px solid var(--ink);border-radius:28px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+h2{font-size:60px;line-height:1.05;color:var(--ink)}
+.row{display:flex;gap:22px;justify-content:center;flex-wrap:wrap}
+
+/* parlak şeker düğmeler */
+.btn{font-family:var(--font-display);font-weight:700;font-size:40px;color:var(--ink);cursor:pointer;
+  background:linear-gradient(180deg,#fff27a 0%,#ffd23a 45%,#f2b100 100%);
+  border:5px solid var(--ink);border-radius:999px;padding:14px 50px 16px;
+  box-shadow:inset 0 6px 0 rgba(255,255,255,.55),inset 0 -8px 0 rgba(150,90,0,.35),0 8px 0 var(--ink);
+  transition:transform .08s,box-shadow .08s}
+.btn.blue{background:linear-gradient(180deg,#8fd0ff 0%,#2f8cff 55%,#1b63c9 100%);color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill}
+.btn.ghost{background:linear-gradient(180deg,#fff 0%,#e9e2d4 100%)}
+.btn:active{transform:translateY(6px);box-shadow:inset 0 6px 0 rgba(255,255,255,.5),inset 0 -6px 0 rgba(150,90,0,.3),0 2px 0 var(--ink)}
+.btn:focus-visible{outline:5px solid var(--blue);outline-offset:4px}
+
+.toggles{display:flex;gap:28px;justify-content:center;margin-top:24px;font-size:24px;font-weight:800}
+.toggle{display:flex;align-items:center;gap:10px;cursor:pointer}
+.toggle input{width:30px;height:30px;accent-color:#f2b100}
+
+/* başlık ekranı */
+#scr-title{background:url(assets/bg_main_menu.jpg) center/cover no-repeat;justify-content:flex-start;padding-left:70px;gap:0}
+#scr-title::before{content:"";position:absolute;inset:0;border-radius:18px;background:linear-gradient(90deg,rgba(8,12,28,.78) 0%,rgba(8,12,28,.35) 55%,rgba(8,12,28,0) 80%)}
+.title-col{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;width:600px}
+.logo{position:relative;width:390px}
+.logo img{width:100%;display:block;filter:drop-shadow(0 16px 24px rgba(0,0,0,.5))}
+.logo h1{position:absolute;left:0;right:0;bottom:8.5%;font-size:96px;line-height:1;color:#fff;letter-spacing:2px;
+  -webkit-text-stroke:9px var(--ink);paint-order:stroke fill;text-shadow:0 8px 0 var(--ink)}
+.tagline{font-family:var(--font-display);font-size:30px;font-weight:600;text-align:center;max-width:24ch;line-height:1.3;
+  color:var(--cream);text-shadow:0 3px 0 rgba(0,0,0,.6)}
+.title-col .toggles{color:var(--cream);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+
+/* bölüm seçimi */
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;margin:26px 0 26px}
+.lvl{position:relative;background:linear-gradient(180deg,#3f8fe0,#1f5fae);border:5px solid var(--ink);border-radius:20px;
+  padding:10px 8px 12px;cursor:pointer;box-shadow:inset 0 4px 0 rgba(255,255,255,.3),0 7px 0 var(--ink);
+  font-family:var(--font-display);color:#fff;min-height:236px;width:170px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.lvl .n{position:absolute;top:6px;left:12px;font-size:40px;font-weight:700;-webkit-text-stroke:4px var(--ink);paint-order:stroke fill}
+.lvl .thumb{height:110px;margin-top:18px;filter:drop-shadow(0 6px 6px rgba(0,0,0,.4))}
+.lvl .lock{height:96px;margin-top:26px;opacity:.9}
+.lvl .name{font-size:21px;font-weight:600;text-shadow:0 2px 0 var(--ink);margin-top:auto}
+.lvl.locked{background:linear-gradient(180deg,#6b7280,#4b5160);cursor:not-allowed}
+.lvl.locked .name{opacity:.8}
+.lvl:not(.locked):hover{transform:translateY(-3px)}
+.lvl:focus-visible{outline:5px solid var(--yellow);outline-offset:3px}
+.stars{display:inline-flex;gap:2px;min-height:34px;align-items:center}
+.star{width:30px;height:30px}
+.star.off{filter:grayscale(1) brightness(.5);opacity:.6}
+.star.big{width:76px;height:76px}
+.star.big:nth-child(2){transform:translateY(-12px) scale(1.15)}
+
+/* tanıtım, kazanma, kaybetme */
+.hero{height:420px;filter:drop-shadow(0 16px 20px rgba(0,0,0,.5))}
+.story{font-size:25px;max-width:30ch;margin:16px auto 22px;line-height:1.45;font-weight:700}
+.newunit,.unlock{display:inline-flex;align-items:center;gap:14px;font-size:22px;font-weight:800;background:rgba(255,255,255,.55);
+  border:4px dashed #b8874c;border-radius:18px;padding:8px 22px 8px 10px;margin:0 0 22px;text-align:left}
+.newunit img,.unlock img{height:78px}
+.newunit b,.unlock b{display:block;font-family:var(--font-display);font-size:28px}
+#scr-win .panel{min-width:620px}
+.family{height:230px;margin:-10px 0 4px;filter:drop-shadow(0 12px 16px rgba(0,0,0,.4))}
+
+#rotate{position:fixed;inset:0;background:var(--night);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;text-align:center;z-index:50;font-family:var(--font-display);font-size:26px;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+#rotate .phone{width:70px;height:120px;border:6px solid var(--cream);border-radius:16px;animation:turn 2s ease-in-out infinite}
+#rotate button{font-family:var(--font-body);font-size:16px;background:none;border:2px solid var(--cream);color:var(--cream);border-radius:10px;padding:8px 14px}
+@keyframes turn{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (prefers-reduced-motion:reduce){#rotate .phone{animation:none}.btn{transition:none}}
+
+/* v0.3 ek stiller */
+.btn:disabled{filter:grayscale(.8) brightness(.85);cursor:not-allowed;transform:none}
+.btn.small{font-size:26px;padding:6px 22px 8px;border-width:4px;box-shadow:inset 0 4px 0 rgba(255,255,255,.55),inset 0 -5px 0 rgba(150,90,0,.35),0 5px 0 var(--ink);display:inline-flex;align-items:center;gap:8px}
+.btn.small img{height:28px}
+.coin-pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:30px;font-weight:700;color:#ffe08a;
+  background:rgba(40,26,18,.82);border:3px solid rgba(255,230,180,.4);border-radius:999px;padding:4px 20px 4px 8px;text-shadow:0 2px 0 var(--ink)}
+.coin-pill img{height:44px}
+.top-right{position:absolute;top:26px;right:30px;display:flex;gap:16px;align-items:center;z-index:2}
+.icon-btn{background:none;border:0;padding:0;cursor:pointer;width:84px;height:84px;filter:drop-shadow(0 6px 8px rgba(0,0,0,.4))}
+.icon-btn img{width:100%;height:100%}
+.icon-btn:active{transform:translateY(3px)}
+.menu-row{display:flex;gap:16px;margin-top:6px}
+.menu-tile{position:relative;width:118px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;
+  background:linear-gradient(180deg,#3f8fe0,#1f5fae);border:4px solid var(--ink);border-radius:20px;padding:8px 4px 8px;
+  box-shadow:inset 0 4px 0 rgba(255,255,255,.3),0 6px 0 var(--ink);color:#fff;font-family:var(--font-display)}
+.menu-tile img{height:62px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.35))}
+.menu-tile span{font-size:21px;font-weight:700;text-shadow:0 2px 0 var(--ink);line-height:1.1}
+.menu-tile small{font-family:var(--font-body);font-size:14px;font-weight:800;opacity:.9;line-height:1.15;text-align:center;min-height:16px}
+.menu-tile.locked{background:linear-gradient(180deg,#6b7280,#4b5160)}
+.menu-tile.locked img{filter:grayscale(1) brightness(.7)}
+.menu-tile.badge::after{content:"!";position:absolute;top:-12px;right:-10px;width:34px;height:34px;border-radius:50%;background:#e8452c;
+  border:3px solid var(--ink);font-size:24px;font-weight:700;display:grid;place-items:center;animation:pulse 1s ease-in-out infinite}
+.menu-tile:active{transform:translateY(4px);box-shadow:inset 0 4px 0 rgba(255,255,255,.3),0 2px 0 var(--ink)}
+@keyframes pulse{50%{transform:scale(1.15)}}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.panel-head h2{text-align:left}
+.total-stars{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:30px;font-weight:700}
+.total-stars img{width:40px}
+.levels{grid-template-columns:repeat(5,1fr);gap:16px;margin:18px 0 22px}
+.lvl{min-height:178px;width:168px;padding:8px 6px 8px}
+.lvl .thumb{height:78px;margin-top:22px;max-width:140px;object-fit:contain}
+.lvl .thumb.dark{filter:brightness(.25) drop-shadow(0 0 8px #7dff5a)}
+.lvl .thumb.queen,.book-tile img.queen{filter:hue-rotate(250deg) saturate(1.6) drop-shadow(0 6px 6px rgba(0,0,0,.4))}
+.lvl .lock{height:70px;margin-top:28px}
+.lvl .name{font-size:19px}
+.lvl.special{background:linear-gradient(180deg,#9a62e8,#5b2fae)}
+.lvl.locked.special{background:linear-gradient(180deg,#6b7280,#4b5160)}
+.lvl .tag{position:absolute;top:8px;right:8px;background:#ffd23a;color:var(--ink);font-size:15px;font-weight:700;border:3px solid var(--ink);border-radius:999px;padding:0 8px}
+.lvl .stars{min-height:28px}.lvl .star{width:26px;height:26px}
+.goals{list-style:none;padding:0;margin:0 auto 16px;display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:center;font-size:20px;font-weight:800;max-width:640px}
+.goals li{display:flex;align-items:center;gap:6px}
+.goals li::before{content:"";width:26px;height:26px;background:url(assets/item_star_gold.png) center/contain no-repeat}
+.goals.done li.no{opacity:.55}
+.goals.done li.no::before{filter:grayscale(1)}
+.goals.done li.ok{color:#2f7a12}
+.modbox{background:#fff1c9;border:4px dashed #e2a400;border-radius:18px;padding:8px 18px;margin:0 auto 16px;max-width:560px;font-size:21px;font-weight:700}
+.modbox b{display:block;font-family:var(--font-display);font-size:28px;color:#b5520e}
+.picker{margin:0 0 18px}
+.picker p{margin:0 0 8px;font-size:20px;font-weight:800}
+.picker-grid{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.pick{width:96px;height:112px;border:4px solid var(--ink);border-radius:16px;background:#d9cbb0;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 4px 4px;opacity:.6;filter:grayscale(.7)}
+.pick img{height:64px;max-width:84px;object-fit:contain}
+.pick span{font-family:var(--font-display);font-size:20px;font-weight:700}
+.pick.on{background:linear-gradient(180deg,#8fd0ff,#2f8cff);opacity:1;filter:none;box-shadow:0 0 0 4px #ffd23a}
+.story{font-size:23px;margin:12px auto 16px}
+.hero{height:400px}
+.coins-line{display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-display);font-size:34px;font-weight:700;color:#8a5a00;margin:0 0 14px;min-height:10px}
+.coins-line img{height:46px}
+.family{height:150px;margin:-14px 0 0}
+#win-stars{margin:6px 0 10px}
+.settings{display:grid;grid-template-columns:auto 320px;gap:18px 30px;align-items:center;text-align:left;font-size:26px;font-weight:800;margin:26px auto 26px;width:max-content}
+.settings input[type=range]{width:320px;accent-color:#f2b100;height:30px}
+.settings input[type=checkbox]{width:34px;height:34px;accent-color:#f2b100}
+.btn.danger{background:linear-gradient(180deg,#ffb3a3,#e8452c);color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;font-size:24px;padding:8px 26px}
+.shop-grid{display:grid;grid-template-columns:repeat(3,280px);gap:16px;margin:16px 0 20px}
+.shop-item{background:rgba(255,255,255,.6);border:4px solid #b8874c;border-radius:20px;padding:10px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:212px}
+.shop-item img{height:74px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.3))}
+.shop-item h3{font-size:24px}
+.shop-item p{margin:0;font-size:17px;font-weight:800;min-height:24px;line-height:1.2}
+.shop-item .btn{margin-top:auto}
+.shop-item.locked img{filter:brightness(0) opacity(.45)}
+.pips{display:flex;gap:6px}.pips i{width:22px;height:22px;border-radius:50%;border:3px solid var(--ink);background:#e9e2d4}.pips i.on{background:#ffd23a}
+.book{display:grid;grid-template-columns:auto 420px;gap:24px;margin:16px 0 20px;text-align:left}
+.tabs{display:flex;gap:10px;justify-content:center;margin-top:10px}
+.tab{font-family:var(--font-display);font-size:24px;font-weight:700;border:4px solid var(--ink);border-radius:999px;padding:4px 22px;background:#e9e2d4;cursor:pointer;color:var(--ink)}
+.tab.on{background:#ffd23a}
+.book-grid{display:grid;grid-template-columns:repeat(3,130px);gap:12px;align-content:start}
+.book-tile{width:130px;height:120px;border:4px solid var(--ink);border-radius:18px;background:linear-gradient(180deg,#3f8fe0,#1f5fae);cursor:pointer;display:grid;place-items:center;padding:6px}
+.book-tile img{max-width:110px;max-height:100px}
+.book-tile.unknown{background:linear-gradient(180deg,#6b7280,#4b5160)}
+.book-tile.unknown img{filter:brightness(0) opacity(.55)}
+.book-tile.on{box-shadow:0 0 0 5px #ffd23a}
+.book-detail{background:rgba(255,255,255,.6);border:4px solid #b8874c;border-radius:20px;padding:14px 20px;min-height:250px}
+.book-detail h3{font-size:34px;margin-bottom:8px}
+.book-detail dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0 0 10px;font-size:21px;font-weight:800}
+.book-detail dt{color:#7a5a3a}.book-detail dd{margin:0}
+.book-detail .note{font-size:19px;font-weight:700;line-height:1.4;margin:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage-wrap">
+    <div id="stage">
+      <canvas id="game" width="1600" height="900"></canvas>
+
+      <div class="overlay" id="scr-title">
+        <div class="top-right">
+          <span class="coin-pill"><img src="assets/item_coin.png" alt="Altın"><b>0</b></span>
+          <button class="icon-btn" id="btn-settings" aria-label="Ayarlar"><img src="assets/btn_settings.png" alt=""></button>
+        </div>
+        <div class="title-col">
+          <div class="logo"><img src="assets/ui_logo_emblem.png" alt=""><h1>Raid!</h1></div>
+          <p class="tagline">Bir ilaç böcekleri dev yaptı. Defne'nin icatlarıyla evini oda oda geri al!</p>
+          <button class="btn" id="btn-play">Oyna</button>
+          <div class="menu-row">
+            <button class="menu-tile" id="btn-shop" data-label="Geliştir"><img src="assets/icon_wrench.png" alt=""><span>Atölye</span><small>Geliştir</small></button>
+            <button class="menu-tile" id="btn-book" data-label="Böcekler"><img src="assets/icon_book.png" alt=""><span>Kitap</span><small>Böcekler</small></button>
+            <button class="menu-tile" id="btn-daily" data-label="Her gün yeni"><img src="assets/icon_map.png" alt=""><span>Günlük</span><small>Her gün yeni</small></button>
+            <button class="menu-tile" id="btn-endless" data-label="Rekor kır"><img src="assets/icon_trophy.png" alt=""><span>Sonsuz</span><small>Rekor kır</small></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-levels" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>Çocuk Odası</h2><span class="total-stars"><img src="assets/item_star_gold.png" alt="Yıldız"><span id="levels-stars">0</span></span></div>
+          <div class="levels" id="level-grid"></div>
+          <div class="row"><button class="btn ghost" id="btn-levels-back">Geri</button></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-intro" hidden>
+        <img class="hero" src="assets/char_defne.png" alt="Defne">
+        <div class="panel">
+          <h2 id="intro-title">Çocuk Odası 1</h2>
+          <p class="story" id="intro-text"></p>
+          <div class="modbox" id="intro-mod" hidden></div>
+          <div class="newunit" id="intro-new" hidden></div>
+          <ul class="goals" id="intro-goals" hidden></ul>
+          <div class="picker" id="picker" hidden><p id="picker-count"></p><div class="picker-grid" id="picker-grid"></div></div>
+          <div class="row">
+            <button class="btn ghost" id="btn-intro-back">Geri</button>
+            <button class="btn" id="btn-start">Savun!</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-pause" hidden>
+        <div class="panel">
+          <h2>Duraklatıldı</h2>
+          <div class="row" style="margin-top:28px">
+            <button class="btn" id="btn-resume">Devam</button>
+            <button class="btn blue" id="btn-restart">Yeniden</button>
+          </div>
+          <div class="row" style="margin-top:22px">
+            <button class="btn ghost" id="btn-pause-levels">Çık</button>
+            <button class="btn ghost" id="btn-pause-settings">Ayarlar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-settings" hidden>
+        <div class="panel">
+          <h2>Ayarlar</h2>
+          <div class="settings">
+            <label for="set-music">Müzik</label><input type="range" id="set-music" min="0" max="100">
+            <label for="set-sfx">Ses efektleri</label><input type="range" id="set-sfx" min="0" max="100">
+            <label for="set-vib">Titreşim (telefonda)</label><input type="checkbox" id="set-vib">
+            <label for="set-auto">Vidaları otomatik topla</label><input type="checkbox" id="set-auto">
+          </div>
+          <div class="row">
+            <button class="btn danger" id="btn-reset">İlerlemeyi sıfırla</button>
+            <button class="btn" id="btn-settings-back">Tamam</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-shop" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>Atölye</h2><span class="coin-pill"><img src="assets/item_coin.png" alt="Altın"><b>0</b></span></div>
+          <div class="shop-grid" id="shop-grid"></div>
+          <div class="row"><button class="btn ghost" id="btn-shop-back">Geri</button></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-book" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>Defne'nin Kitabı</h2>
+            <div class="tabs"><button class="tab on" data-tab="bugs">Böcekler</button><button class="tab" data-tab="units">Planlar</button></div></div>
+          <div class="book"><div class="book-grid" id="book-grid"></div><div class="book-detail" id="book-detail"></div></div>
+          <div class="row"><button class="btn ghost" id="btn-book-back">Geri</button></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-win" hidden>
+        <div class="panel">
+          <img class="family" src="assets/char_family_group.png" alt="Yılmaz ailesi">
+          <h2 id="win-title">Oda temizlendi!</h2>
+          <div id="win-stars"></div>
+          <div id="win-goals"></div>
+          <p class="story" id="win-text"></p>
+          <div class="coins-line" id="win-coins"></div>
+          <div id="win-unlock"></div>
+          <div class="row">
+            <button class="btn ghost" id="btn-win-levels">Bölümler</button>
+            <button class="btn" id="btn-next">Sonraki bölüm</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="scr-lose" hidden>
+        <img class="hero" id="lose-hero" src="assets/char_ege.png" alt="">
+        <div class="panel">
+          <h2 id="lose-title">Böcekler Ege'ye ulaştı!</h2>
+          <p class="story" id="lose-text">Ege yorganın altına saklandı. Bir daha deneyelim mi?</p>
+          <div class="coins-line" id="lose-coins"></div>
+          <div class="row">
+            <button class="btn ghost" id="btn-lose-levels">Çık</button>
+            <button class="btn" id="btn-retry">Tekrar dene</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" hidden>
+  <div class="phone"></div>
+  <div>Telefonu yan çevir</div>
+  <button id="btn-rotate-ignore">Yine de dikey oyna</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
